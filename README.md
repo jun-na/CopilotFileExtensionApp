@@ -44,9 +44,11 @@ Microsoft Copilotにファイルを簡単に渡すためのWPFデスクトップ
 ## インストール
 
 ### 前提条件
-- .NET 10.0 Windows
-- Windows 10/11
-- WebView2ランタイム
+- Windows 10/11 (x64)
+- WebView2ランタイム（通常はWindowsに標準搭載）
+
+### リリース版のダウンロード
+[Releasesページ](../../releases)から最新版のZIPファイルをダウンロードし、解凍して実行してください。
 
 ### ビルド方法
 ```bash
@@ -55,6 +57,16 @@ cd CopilotExtensionApp
 dotnet build
 dotnet run
 ```
+
+### シングルバイナリでビルド
+```bash
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+```
+
+### GitHub Actionsでの自動リリース
+1. タグをプッシュ: `git tag v0.4.0 && git push origin v0.4.0`
+2. GitHub Actionsが自動でビルド＆リリースを作成
+3. ReleasesページからZIPをダウンロード可能
 
 ## 使用方法
 
