@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 using CopilotExtensionApp.Models;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
+using System.Text.Json;
+using System.Windows.Threading;
+using R3;
 
 namespace CopilotExtensionApp;
 
@@ -19,10 +22,30 @@ public partial class MainWindow : Window
 {
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
 
+    private readonly string _settingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "CopilotExtensionApp",
+        "settings.json"
+    );
+
     public MainWindow()
     {
         InitializeComponent();
         Loaded += MainWindow_Loaded;
+        
+        // 設定フォルダがなければ作成
+        var settingsDir = Path.GetDirectoryName(_settingsPath);
+        if (!Directory.Exists(settingsDir))
+        {
+            Directory.CreateDirectory(settingsDir);
+        }
+        
+        // 保存したパスを読み込む
+        LoadSavedPath();
+        
+        // R3でタイマーを実装
+        Observable.Interval(TimeSpan.FromSeconds(5))
+            .Subscribe(_ => Dispatcher.Invoke(Timer_Tick));
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -53,16 +76,25 @@ public partial class MainWindow : Window
 
     private void SelectFolderButton_Click(object sender, RoutedEventArgs e)
     {
-        using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            dialog.Description = "フォルダを選択してください";
-            dialog.SelectedPath = ViewModel.CurrentPath.Value;
-            dialog.ShowNewFolderButton = true;
+            Title = "フォルダを選択してください",
+            Filter = "フォルダ|*.none",
+            CheckFileExists = false,
+            CheckPathExists = true,
+            FileName = "フォルダ選択"
+        };
 
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        if (dialog.ShowDialog() == true)
+        {
+            var folderPath = Path.GetDirectoryName(dialog.FileName);
+            if (!string.IsNullOrEmpty(folderPath))
             {
-                ViewModel.CurrentPath.Value = dialog.SelectedPath;
+                ViewModel.CurrentPath.Value = folderPath;
                 _ = LoadFilesToFancyTree();
+                
+                // 選択したパスを保存
+                SaveCurrentPath();
             }
         }
     }
@@ -158,6 +190,80 @@ public partial class MainWindow : Window
     private void RefreshFilesButton_Click(object sender, RoutedEventArgs e)
     {
         _ = LoadFilesToFancyTree();
+    }
+
+    private void SwapPanelsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var grid = this.Content as Grid;
+            if (grid == null) return;
+
+            var copilotBorder = grid.Children[0] as Border;
+            var fileExplorerBorder = grid.Children[2] as Border;
+            
+            if (copilotBorder == null || fileExplorerBorder == null) return;
+
+            // 現在の列位置を取得
+            var copilotColumn = Grid.GetColumn(copilotBorder);
+            var fileExplorerColumn = Grid.GetColumn(fileExplorerBorder);
+            
+            // 列位置を入れ替え
+            Grid.SetColumn(copilotBorder, fileExplorerColumn);
+            Grid.SetColumn(fileExplorerBorder, copilotColumn);
+            
+            ViewModel.StatusMessage.Value = "パネルを入れ替えました";
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage.Value = $"入れ替えエラー: {ex.Message}";
+        }
+    }
+
+    private void LoadSavedPath()
+    {
+        try
+        {
+            if (File.Exists(_settingsPath))
+            {
+                var json = File.ReadAllText(_settingsPath);
+                var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+                if (settings?.LastPath != null && Directory.Exists(settings.LastPath))
+                {
+                    ViewModel.CurrentPath.Value = settings.LastPath;
+                    ViewModel.StatusMessage.Value = $"保存したパスを読み込みました: {settings.LastPath}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage.Value = $"設定読み込みエラー: {ex.Message}";
+        }
+    }
+
+    private void SaveCurrentPath()
+    {
+        try
+        {
+            var settings = new AppSettings
+            {
+                LastPath = ViewModel.CurrentPath.Value
+            };
+            
+            var json = System.Text.Json.JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_settingsPath, json);
+        }
+        catch (Exception ex)
+        {
+            // エラーは通知しない（静かに失敗）
+            System.Diagnostics.Debug.WriteLine($"設定保存エラー: {ex.Message}");
+        }
+    }
+
+    private void Timer_Tick()
+    {
+        // 定期的な処理が必要な場合はここに追加
+        // 例: ステータス更新、バックグラウンド処理など
     }
 
     private async void SendToCopilotButton_Click(object sender, RoutedEventArgs e)

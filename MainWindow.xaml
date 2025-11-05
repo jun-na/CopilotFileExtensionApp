@@ -34,9 +34,23 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 
-                <TextBlock Grid.Row="0" Text="Microsoft Copilot" 
-                          FontSize="16" FontWeight="Bold" 
-                          Margin="10" Background="LightBlue" Padding="5"/>
+                <!-- タイトルと入れ替えボタン -->
+                <Grid Grid.Row="0" Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock Grid.Column="0" Text="Microsoft Copilot" 
+                              FontSize="16" FontWeight="Bold" 
+                              Background="LightBlue" Padding="5"/>
+                    
+                    <Button Grid.Column="1" Content="⇄" 
+                           Width="30" Height="25" 
+                           Click="SwapPanelsButton_Click" 
+                           ToolTip="パネルを入れ替え" 
+                           Margin="5,0,0,0"/>
+                </Grid>
                 
                 <wv2:WebView2 x:Name="CopilotWebView" Grid.Row="1" 
                          Source="https://copilot.microsoft.com"/>
@@ -57,10 +71,23 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 
-                <!-- タイトル -->
-                <TextBlock Grid.Row="0" Text="ファイルエクスプローラ" 
-                          FontSize="16" FontWeight="Bold" 
-                          Margin="10" Background="LightGreen" Padding="5"/>
+                <!-- タイトルと入れ替えボタン -->
+                <Grid Grid.Row="0" Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock Grid.Column="0" Text="ファイルエクスプローラ" 
+                              FontSize="16" FontWeight="Bold" 
+                              Background="LightGreen" Padding="5"/>
+                    
+                    <Button Grid.Column="1" Content="⇄" 
+                           Width="30" Height="25" 
+                           Click="SwapPanelsButton_Click" 
+                           ToolTip="パネルを入れ替え" 
+                           Margin="5,0,0,0"/>
+                </Grid>
                 
                 <!-- パスとボタン -->
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="10">

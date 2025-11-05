@@ -376,7 +376,7 @@
                 if (!fancyTree) {
                     console.error('FancyTree is not initialized');
                     logDebug('FancyTreeが初期化されていません');
-                    return [];
+                    return "[]";
                 }
                 
                 const selectedFiles = [];
@@ -398,12 +398,12 @@
                 }
                 
                 updateStatus(`${selectedFiles.length}件のファイルを選択しました`);
-                return selectedFiles;
+                return JSON.stringify(selectedFiles);
             } catch (error) {
                 console.error('getSelectedFiles error:', error);
                 logDebug(`選択ファイル取得エラー: ${error.message}`);
                 updateStatus(`選択エラー: ${error.message}`);
-                return [];
+                return "[]";
             }
         }
         
