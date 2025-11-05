@@ -1,17 +1,49 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.ComponentModel;
 
 namespace CopilotExtensionApp.Models
 {
-    public class FileSystemItem
+    public class FileSystemItem : INotifyPropertyChanged
     {
+        private bool _isSelected;
+        private bool _isExpanded;
         public string Name { get; set; } = string.Empty;
         public string FullPath { get; set; } = string.Empty;
         public bool IsDirectory { get; set; }
-        public bool IsExpanded { get; set; }
         public ObservableCollection<FileSystemItem> Children { get; set; } = new();
-        
         public FileSystemItem? Parent { get; set; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    OnPropertyChanged(nameof(IsSelected));
+                }
+            }
+        }
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set
+            {
+                if (_isExpanded != value)
+                {
+                    _isExpanded = value;
+                    OnPropertyChanged(nameof(IsExpanded));
+                    
+                    if (value && IsDirectory && Children.Count == 0)
+                    {
+                        LoadChildren();
+                    }
+                }
+            }
+        }
 
         public FileSystemItem(string path, FileSystemItem? parent = null)
         {
@@ -22,11 +54,12 @@ namespace CopilotExtensionApp.Models
             
             if (IsDirectory)
             {
-                LoadChildren();
+                // ダミーの子アイテムを追加して展開可能に表示
+                Children.Add(new FileSystemItem("Loading..."));
             }
         }
 
-        private void LoadChildren()
+        public void LoadChildren()
         {
             try
             {
@@ -58,6 +91,13 @@ namespace CopilotExtensionApp.Models
             {
                 LoadChildren();
             }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

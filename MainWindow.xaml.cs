@@ -1,18 +1,13 @@
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using Microsoft.Web.WebView2.Wpf;
 using CopilotExtensionApp.ViewModels;
-using Microsoft.Web.WebView2.Core;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using CopilotExtensionApp.Models;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 
 namespace CopilotExtensionApp;
@@ -34,24 +29,26 @@ public partial class MainWindow : Window
     {
         // WebView2の初期化を待つ
         await CopilotWebView.EnsureCoreWebView2Async(null);
+        await FileExplorerWebView.EnsureCoreWebView2Async(null);
         
         // C#オブジェクトをJavaScriptに公開
         CopilotWebView.CoreWebView2.AddHostObjectToScript("fileHelper", new FileHelper());
-    }
-
-    private void FileSystemTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-    {
-        // 選択されたアイテムをViewModelに反映
-        ViewModel.SelectedItems.Clear();
+        FileExplorerWebView.CoreWebView2.AddHostObjectToScript("fileHelper", new FileHelper());
         
-        if (e.NewValue is FileSystemItem selectedItem)
+        // FancyTreeの読み込み完了イベントを設定
+        FileExplorerWebView.CoreWebView2.NavigationCompleted += async (s, args) =>
         {
-            // ファイルのみを選択対象にする
-            if (!selectedItem.IsDirectory)
-            {
-                ViewModel.SelectedItems.Add(selectedItem);
-            }
-        }
+            ViewModel.StatusMessage.Value = "FancyTree読み込み完了";
+            
+            // 少し待ってから初期フォルダを読み込み
+            await Task.Delay(1000);
+            await LoadFilesToFancyTree();
+        };
+        
+        // FancyTreeを読み込み
+        var htmlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot", "file-explorer.html");
+        var fileUri = new Uri(htmlPath).AbsoluteUri;
+        FileExplorerWebView.CoreWebView2.Navigate(fileUri);
     }
 
     private void SelectFolderButton_Click(object sender, RoutedEventArgs e)
@@ -65,25 +62,142 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 ViewModel.CurrentPath.Value = dialog.SelectedPath;
-                ViewModel.LoadFileSystem();
+                _ = LoadFilesToFancyTree();
             }
         }
     }
 
-    private void SendToCopilotButton_Click(object sender, RoutedEventArgs e)
+    private async Task LoadFilesToFancyTree()
     {
-        var selectedFiles = ViewModel.SelectedItems.Where(x => !x.IsDirectory).ToList();
-        
-        if (selectedFiles.Count == 0)
+        try
         {
-            ViewModel.StatusMessage.Value = "ファイルが選択されていません";
-            return;
+            ViewModel.StatusMessage.Value = "ファイルを読み込み中...";
+            
+            // ファイルデータを収集
+            var files = await GetFileDataAsync(ViewModel.CurrentPath.Value);
+            ViewModel.StatusMessage.Value = $"{files.Count}件のファイル/フォルダを取得";
+            
+            var json = System.Text.Json.JsonSerializer.Serialize(files);
+            ViewModel.StatusMessage.Value = $"JSONサイズ: {json.Length}文字";
+            
+            // JavaScriptにファイルデータを渡す
+            var script = $"console.log('Sending data to FancyTree: {json.Length} chars'); loadFiles('{System.Web.HttpUtility.JavaScriptStringEncode(json)}');";
+            await FileExplorerWebView.CoreWebView2.ExecuteScriptAsync(script);
+            
+            ViewModel.StatusMessage.Value = $"{files.Count}件のファイルを読み込みました";
         }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage.Value = $"エラー: {ex.Message}";
+        }
+    }
 
-        var filePaths = selectedFiles.Select(x => x.FullPath).ToList();
+    private async Task<List<FileData>> GetFileDataAsync(string rootPath)
+    {
+        var files = new List<FileData>();
         
-        // 直接送信処理を呼び出す
-        _ = SendFilesToCopilotAsync(filePaths);
+        await Task.Run(() =>
+        {
+            try
+            {
+                // まずフォルダを収集
+                var folders = Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories);
+                foreach (var folderPath in folders)
+                {
+                    var relativePath = Path.GetRelativePath(rootPath, folderPath);
+                    
+                    files.Add(new FileData
+                    {
+                        fullPath = folderPath,
+                        relativePath = relativePath.Replace('\\', '/'),
+                        name = Path.GetFileName(folderPath),
+                        size = 0,
+                        lastModified = Directory.GetLastWriteTime(folderPath),
+                        extension = "" // フォルダは拡張子なし
+                    });
+                }
+                
+                // 次にファイルを収集
+                var allFiles = Directory.GetFiles(rootPath, "*.*", SearchOption.AllDirectories);
+                foreach (var filePath in allFiles)
+                {
+                    if (IsSystemFile(filePath)) continue;
+                    
+                    var fileInfo = new FileInfo(filePath);
+                    var relativePath = Path.GetRelativePath(rootPath, filePath);
+                    
+                    files.Add(new FileData
+                    {
+                        fullPath = filePath,
+                        relativePath = relativePath.Replace('\\', '/'),
+                        name = fileInfo.Name,
+                        size = fileInfo.Length,
+                        lastModified = fileInfo.LastWriteTime,
+                        extension = fileInfo.Extension.ToLower()
+                    });
+                }
+                
+                files.Sort((a, b) => string.Compare(a.relativePath, b.relativePath, StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                ViewModel.StatusMessage.Value = $"ファイル取得エラー: {ex.Message}";
+            }
+        });
+        
+        return files;
+    }
+
+    private bool IsSystemFile(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath).ToLower();
+        var systemFiles = new[] { "thumbs.db", "desktop.ini", ".ds_store" };
+        return systemFiles.Contains(fileName);
+    }
+
+    private void RefreshFilesButton_Click(object sender, RoutedEventArgs e)
+    {
+        _ = LoadFilesToFancyTree();
+    }
+
+    private async void SendToCopilotButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ViewModel.StatusMessage.Value = "選択ファイルを確認中...";
+            
+            // FancyTreeから選択ファイルを取得
+            var script = "getSelectedFiles();";
+            var result = await FileExplorerWebView.CoreWebView2.ExecuteScriptAsync(script);
+            
+            // WebView2は結果を引用符で囲んで返すので除去
+            if (!string.IsNullOrEmpty(result) && result.StartsWith("\"") && result.EndsWith("\""))
+            {
+                result = result.Substring(1, result.Length - 2);
+                // Unicodeエスケープをデコード
+                result = System.Text.RegularExpressions.Regex.Unescape(result);
+            }
+            
+            if (string.IsNullOrEmpty(result) || result == "null" || result == "[]")
+            {
+                ViewModel.StatusMessage.Value = "ファイルが選択されていません";
+                return;
+            }
+            
+            // JSONからファイルパスを抽出
+            var selectedFiles = System.Text.Json.JsonSerializer.Deserialize<List<FileData>>(result);
+            if (selectedFiles == null) return;
+            
+            var filePaths = selectedFiles.Select(f => f.fullPath).ToList();
+            ViewModel.StatusMessage.Value = $"{filePaths.Count}件のファイルを選択しました";
+            
+            // Copilotに送信
+            await SendFilesToCopilotAsync(filePaths);
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage.Value = $"エラー: {ex.Message}";
+        }
     }
 
     private async Task SendFilesToCopilotAsync(List<string> filePaths)

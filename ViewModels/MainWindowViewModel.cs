@@ -1,50 +1,65 @@
-using R3;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using R3;
 using CopilotExtensionApp.Models;
 
 namespace CopilotExtensionApp.ViewModels
 {
     public class MainWindowViewModel
     {
-        public BindableReactiveProperty<string> CurrentPath { get; } = new(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+        public BindableReactiveProperty<string> CurrentPath { get; set; } = new();
+        public BindableReactiveProperty<string> StatusMessage { get; set; } = new("準備完了");
+        public ObservableCollection<FileItem> AllFiles { get; set; } = new();
         
-        public ObservableCollection<FileSystemItem> RootItems { get; } = new();
-        
-        public ObservableCollection<FileSystemItem> SelectedItems { get; } = new();
-        
-        public BindableReactiveProperty<string> StatusMessage { get; } = new("準備完了");
-        
-        public ReactiveCommand<Unit> RefreshCommand { get; }
+        public ReactiveCommand<Unit> RefreshCommand { get; set; }
 
         public MainWindowViewModel()
         {
-            RefreshCommand = Observable.Return(true).ToReactiveCommand<Unit>();
-            RefreshCommand.Subscribe(_ => LoadFileSystem());
+            // 初期パスをデスクトップに設定
+            CurrentPath.Value = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             
-            LoadFileSystem();
+            RefreshCommand = new ReactiveCommand<Unit>();
+            RefreshCommand.Subscribe(_ => LoadFiles());
+            
+            LoadFiles();
         }
 
-        public void LoadFileSystem()
+        public void LoadFiles()
         {
+            AllFiles.Clear();
+            
+            if (!Directory.Exists(CurrentPath.Value))
+            {
+                StatusMessage.Value = "フォルダが存在しません";
+                return;
+            }
+
             try
             {
-                RootItems.Clear();
-                
-                if (Directory.Exists(CurrentPath.Value))
+                var files = Directory.GetFiles(CurrentPath.Value, "*.*", SearchOption.AllDirectories)
+                    .Where(f => !IsSystemFile(f))
+                    .OrderBy(f => f)
+                    .Select(f => new FileItem(f));
+
+                foreach (var file in files)
                 {
-                    var rootItem = new FileSystemItem(CurrentPath.Value);
-                    rootItem.IsExpanded = true;
-                    RootItems.Add(rootItem);
+                    AllFiles.Add(file);
                 }
-                
-                StatusMessage.Value = $"ファイルシステム読み込み完了";
+
+                StatusMessage.Value = $"{AllFiles.Count}件のファイルを読み込みました";
             }
             catch (Exception ex)
             {
                 StatusMessage.Value = $"エラー: {ex.Message}";
             }
+        }
+
+        private bool IsSystemFile(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath).ToLower();
+            var systemFiles = new[] { "thumbs.db", "desktop.ini", ".ds_store" };
+            return systemFiles.Contains(fileName);
         }
     }
 }

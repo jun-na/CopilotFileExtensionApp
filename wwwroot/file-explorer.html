@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ファイルエクスプローラ</title>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- jQuery UI (FancyTreeの依存) -->
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    
+    <!-- FancyTree CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.5/skin-win8-n/ui.fancytree.min.css" rel="stylesheet">
+    
+    <!-- FancyTree JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.38.5/jquery.fancytree-all.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        #tree {
+            border: 1px solid #ccc;
+            background: white;
+            padding: 5px;
+            height: calc(100vh - 80px);
+            overflow: auto;
+        }
+        
+        .fancytree-container {
+            border: none;
+        }
+        
+        .fancytree-node {
+            padding: 2px 0;
+        }
+        
+        .fancytree-title {
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .fancytree-title:hover {
+            background: #e8f4fd;
+        }
+        
+        .fancytree-focused .fancytree-title {
+            background: #3399ff;
+            color: white;
+        }
+        
+        .fancytree-selected .fancytree-title {
+            background: #0078d4;
+            color: white;
+        }
+        
+        .fancytree-expander {
+            margin-right: 3px;
+        }
+        
+        .fancytree-icon {
+            margin-right: 3px;
+        }
+        
+        .file-info {
+            font-size: 11px;
+            color: #666;
+            margin-left: 5px;
+        }
+        
+        .toolbar {
+            margin-bottom: 10px;
+            padding: 5px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .toolbar button {
+            margin-right: 5px;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            background: #f8f8f8;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .toolbar button:hover {
+            background: #e8f4fd;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 5px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="expandAll()">すべて展開</button>
+        <button onclick="collapseAll()">すべて折りたたみ</button>
+        <button onclick="getSelectedFiles()">選択ファイルを取得</button>
+        <button onclick="debugTree()">デバッグ</button>
+    </div>
+    
+    <div id="tree"></div>
+    
+    <div class="status" id="status">準備完了</div>
+    
+    <div id="debug" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border: 1px solid #ccc; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none;">
+        <strong>デバッグ情報:</strong><br>
+        <div id="debugContent"></div>
+    </div>
+    
+    <script>
+        let fancyTree = null;
+        let allFiles = [];
+        
+        // FancyTree初期化
+        function initFancyTree() {
+            $("#tree").fancytree({
+                extensions: ["childcounter", "filter"],
+                checkbox: true,
+                selectMode: 2, // チェックボックス選択モード（複数選択）
+                keyboard: true,
+                quicksearch: true,
+                childcounter: {
+                    deep: true,
+                    hideZeros: true,
+                    hideExpanded: true
+                },
+                filter: {
+                    autoApply: true,
+                    autoExpand: true,
+                    counter: true,
+                    hideExpanders: false,
+                    highlight: true,
+                    leavesOnly: false,
+                    nodata: true,
+                    mode: "dimm"
+                },
+                source: [],
+                icon: function(event, data) {
+                    // カスタムアイコン設定
+                    if (data.node.isFolder()) {
+                        return "📁";
+                    } else {
+                        const ext = data.node.data.fileInfo?.extension;
+                        const icons = {
+                            '.txt': '📄',
+                            '.js': '📜',
+                            '.html': '🌐',
+                            '.css': '🎨',
+                            '.json': '📋',
+                            '.xml': '📄',
+                            '.csv': '📊',
+                            '.pdf': '📕',
+                            '.doc': '📘',
+                            '.docx': '📘',
+                            '.xls': '📗',
+                            '.xlsx': '📗',
+                            '.ppt': '📙',
+                            '.pptx': '📙',
+                            '.jpg': '🖼️',
+                            '.jpeg': '🖼️',
+                            '.png': '🖼️',
+                            '.gif': '🖼️',
+                            '.mp3': '🎵',
+                            '.mp4': '🎬',
+                            '.zip': '🗜️',
+                            '.rar': '🗜️'
+                        };
+                        return icons[ext] || '📄';
+                    }
+                },
+                renderTitle: function(event, data) {
+                    // カスタムタイトル表示
+                    const node = data.node;
+                    const title = node.title;
+                    
+                    if (node.data.fileInfo) {
+                        const file = node.data.fileInfo;
+                        const size = formatFileSize(file.size);
+                        const date = new Date(file.lastModified).toLocaleDateString();
+                        return `${title} <span class="file-info">${size} - ${date}</span>`;
+                    }
+                    return title;
+                },
+                lazyLoad: function(event, data) {
+                    // 子ノードの遅延読み込み
+                    data.result = loadChildren(data.node);
+                },
+                activate: function(event, data) {
+                    // ノードがアクティブになったとき
+                    updateStatus(`選択: ${data.node.title}`);
+                },
+                select: function(event, data) {
+                    // 選択状態が変更されたとき
+                    const selectedNodes = $("#tree").fancytree("getTree").getSelectedNodes();
+                    const selectedFiles = selectedNodes.filter(node => !node.isFolder());
+                    updateStatus(`${selectedFiles.length}件のファイルを選択中`);
+                }
+            });
+            
+            fancyTree = $("#tree").fancytree("getTree");
+        }
+        
+        // ファイルサイズを整形
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        // C#からファイルデータを受け取ってツリーを構築
+        function loadFiles(fileData) {
+            try {
+                console.log('loadFiles called with data length:', fileData.length);
+                logDebug(`受信データ長: ${fileData.length}文字`);
+                
+                allFiles = JSON.parse(fileData);
+                console.log('Parsed files:', allFiles.length);
+                logDebug(`解析ファイル数: ${allFiles.length}`);
+                
+                if (allFiles.length === 0) {
+                    logDebug('ファイルがありません');
+                    updateStatus('ファイルが見つかりません');
+                    return;
+                }
+                
+                // 最初の数件を表示
+                for (let i = 0; i < Math.min(5, allFiles.length); i++) {
+                    logDebug(`ファイル${i}: ${allFiles[i].relativePath} (${allFiles[i].fullPath})`);
+                }
+                
+                const treeData = buildTreeData(allFiles);
+                console.log('Tree data built:', treeData);
+                logDebug(`ツリーデータ: ${treeData.length}件`);
+                
+                if (fancyTree) {
+                    fancyTree.reload(treeData);
+                    logDebug('FancyTreeリロード完了');
+                } else {
+                    logDebug('FancyTreeが初期化されていません');
+                }
+                
+                updateStatus(`${allFiles.length}件のファイルを読み込みました`);
+            } catch (error) {
+                console.error('loadFiles error:', error);
+                logDebug(`エラー: ${error.message}`);
+                updateStatus(`エラー: ${error.message}`);
+            }
+        }
+        
+        // デバッグログ
+        function logDebug(message) {
+            const debugContent = document.getElementById('debugContent');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `[${timestamp}] ${message}<br>`;
+            debugContent.scrollTop = debugContent.scrollHeight;
+            console.log('[DEBUG]', message);
+        }
+        
+        // デバッグ表示切り替え
+        function debugTree() {
+            const debugDiv = document.getElementById('debug');
+            debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+            
+            if (debugDiv.style.display === 'block') {
+                logDebug('=== デバッグ開始 ===');
+                logDebug(`FancyTree状態: ${fancyTree ? '初期化済み' : '未初期化'}`);
+                logDebug(`jQueryバージョン: ${$.fn.jquery}`);
+                logDebug(`jQuery UIバージョン: ${$.ui.version}`);
+                logDebug(`FancyTreeバージョン: ${$.ui.fancytree ? '利用可能' : '不明'}`);
+                
+                if (fancyTree) {
+                    const nodeCount = fancyTree.count();
+                    logDebug(`ツリーノード数: ${nodeCount}`);
+                }
+            }
+        }
+        
+        // ファイルデータからツリーデータを構築
+        function buildTreeData(files) {
+            const tree = {};
+            
+            files.forEach(file => {
+                const parts = file.relativePath.split('/');
+                let current = tree;
+                let currentPath = '';
+                
+                parts.forEach((part, index) => {
+                    currentPath = currentPath ? currentPath + '/' + part : part;
+                    
+                    if (!current[part]) {
+                        // このパスがフォルダかファイルかを判定
+                        const isFolder = files.some(f => 
+                            f.relativePath !== file.relativePath && 
+                            f.relativePath.startsWith(currentPath + '/')
+                        );
+                        
+                        current[part] = {
+                            title: part,
+                            folder: isFolder,
+                            key: file.fullPath,
+                            expanded: false,
+                            children: isFolder ? {} : undefined,
+                            fileInfo: !isFolder ? file : undefined,
+                            path: currentPath
+                        };
+                    }
+                    
+                    // 子要素が存在する場合のみ移動
+                    if (current[part].children) {
+                        current = current[part].children;
+                    }
+                });
+            });
+            
+            // ツリーオブジェクトを配列に変換
+            function convertToArray(obj) {
+                return Object.values(obj).map(item => {
+                    if (item.children && typeof item.children === 'object') {
+                        item.children = convertToArray(item.children);
+                        // フォルダは常にchildrenを持つようにする
+                        if (item.children.length === 0) {
+                            item.children = []; // 空配列を設定
+                        }
+                    }
+                    return item;
+                });
+            }
+            
+            return convertToArray(tree);
+        }
+        
+        // 子ノードを読み込む（遅延読み込み用）
+        function loadChildren(node) {
+            if (!node.data.fileInfo) {
+                return []; // フォルダの場合は空を返す（実際の実装では子を返す）
+            }
+            return [];
+        }
+        
+        // すべて展開
+        function expandAll() {
+            fancyTree.visit(function(node) {
+                node.setExpanded(true);
+            });
+        }
+        
+        // すべて折りたたみ
+        function collapseAll() {
+            fancyTree.visit(function(node) {
+                node.setExpanded(false);
+            });
+        }
+        
+        // 選択されたファイルを取得
+        function getSelectedFiles() {
+            try {
+                console.log('getSelectedFiles called');
+                
+                if (!fancyTree) {
+                    console.error('FancyTree is not initialized');
+                    logDebug('FancyTreeが初期化されていません');
+                    return [];
+                }
+                
+                const selectedFiles = [];
+                
+                fancyTree.visit(function(node) {
+                    if (node.isSelected() && !node.isFolder()) {
+                        console.log(`Selected file: ${node.title}`);
+                        logDebug(`選択ファイル: ${node.title}`);
+                        selectedFiles.push(node.data.fileInfo);
+                    }
+                });
+                
+                console.log('Selected files:', selectedFiles.length);
+                logDebug(`選択ファイル数: ${selectedFiles.length}`);
+                
+                // C#に選択ファイルを通知
+                if (window.chrome && window.chrome.webview && window.chrome.webview.hostObjects) {
+                    window.chrome.webview.hostObjects.fileHelper.setSelectedFiles(JSON.stringify(selectedFiles));
+                }
+                
+                updateStatus(`${selectedFiles.length}件のファイルを選択しました`);
+                return selectedFiles;
+            } catch (error) {
+                console.error('getSelectedFiles error:', error);
+                logDebug(`選択ファイル取得エラー: ${error.message}`);
+                updateStatus(`選択エラー: ${error.message}`);
+                return [];
+            }
+        }
+        
+        // ステータス更新
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        // 初期化
+        $(document).ready(function() {
+            console.log('Document ready, checking libraries');
+            logDebug('ドキュメント準備完了');
+            
+            // ライブラリチェック
+            if (typeof jQuery === 'undefined') {
+                logDebug('jQueryが読み込まれていません');
+                updateStatus('jQuery読み込みエラー');
+                return;
+            }
+            
+            if (typeof $.ui === 'undefined') {
+                logDebug('jQuery UIが読み込まれていません');
+                updateStatus('jQuery UI読み込みエラー');
+                return;
+            }
+            
+            if (typeof $.ui.fancytree === 'undefined') {
+                logDebug('FancyTreeが読み込まれていません');
+                updateStatus('FancyTree読み込みエラー');
+                return;
+            }
+            
+            logDebug('すべてのライブラリが読み込まれました');
+            
+            try {
+                initFancyTree();
+                logDebug('FancyTree初期化完了');
+                updateStatus('FancyTree初期化完了');
+            } catch (error) {
+                console.error('Initialization error:', error);
+                logDebug(`初期化エラー: ${error.message}`);
+                updateStatus(`初期化エラー: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

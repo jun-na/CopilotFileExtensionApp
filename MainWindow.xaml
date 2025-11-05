@@ -12,6 +12,7 @@
     
     <Window.Resources>
         <conv:BoolToIconConverter x:Key="BoolToIconConverter"/>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     </Window.Resources>
     
     <Window.DataContext>
@@ -46,7 +47,7 @@
         <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" 
                      Background="LightGray" ShowsPreview="True"/>
         
-        <!-- 右側：ファイルエクスプローラ -->
+        <!-- 右側：ファイルエクスプローラ WebView2 -->
         <Border Grid.Column="2" BorderBrush="Gray" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
@@ -69,38 +70,15 @@
                               TextTrimming="CharacterEllipsis"/>
                     <Button Content="フォルダ選択" Click="SelectFolderButton_Click" 
                            Width="80" Margin="0,0,10,0"/>
-                    <Button Content="更新" Command="{Binding RefreshCommand}" 
+                    <Button Content="更新" Click="RefreshFilesButton_Click" 
                            Width="60" Margin="0,0,10,0"/>
                     <Button Content="Copilotに送信" Click="SendToCopilotButton_Click" 
                            Width="100"/>
                 </StackPanel>
                 
-                <!-- ファイルツリー -->
-                <TreeView Grid.Row="2" x:Name="FileSystemTreeView" 
-                         ItemsSource="{Binding RootItems}"
-                         SelectedItemChanged="FileSystemTreeView_SelectedItemChanged"
-                         Margin="10">
-                    <TreeView.ItemTemplate>
-                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding IsDirectory, Converter={StaticResource BoolToIconConverter}}" 
-                                          Margin="0,0,5,0"/>
-                                <TextBlock Text="{Binding Name}"/>
-                            </StackPanel>
-                        </HierarchicalDataTemplate>
-                    </TreeView.ItemTemplate>
-                    
-                    <TreeView.ItemContainerStyle>
-                        <Style TargetType="TreeViewItem">
-                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                            <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="LightBlue"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TreeView.ItemContainerStyle>
-                </TreeView>
+                <!-- FancyTreeファイルエクスプローラ WebView2 -->
+                <wv2:WebView2 Grid.Row="2" x:Name="FileExplorerWebView" 
+                              Margin="10"/>
                 
                 <!-- ステータスバー -->
                 <StatusBar Grid.Row="3">

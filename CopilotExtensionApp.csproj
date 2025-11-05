@@ -14,4 +14,10 @@
     <PackageReference Include="R3" Version="1.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
