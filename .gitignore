@@ -1,0 +1,141 @@
+# Ignore build results
+bin/
+obj/
+out/
+build/
+
+# Ignore user specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Ignore build results of NuGet packages
+*.nupkg
+packages/
+!packages/build/
+
+# Ignore Visual Studio Code specific files
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Ignore Visual Studio specific files
+.vs/
+!.vs/settings.json
+!.vs/tasks.json
+!.vs/launch.json
+!.vs/extensions.json
+
+# Ignore Rider specific files
+.idea/
+!.idea/caches/
+!.idea/modules.xml
+!.idea/workspace.xml
+
+# Ignore Test results
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+*.testlog
+*.vspx
+
+# Ignore NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+
+# Ignore Windows specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Ignore macOS specific files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Ignore Linux specific files
+*~
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Ignore backup files
+*.bak
+*.backup
+*.orig
+
+# Ignore published applications
+publish/
+Publish/
+
+# Ignore local configuration files
+appsettings.local.json
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+
+# Ignore local environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Ignore Node.js (if using for frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore Docker
+.dockerignore
+
+# Ignore Azure
+.azure/
+
+# Ignore ReSharper
+_ReSharper*/
+*.ReSharper.*
+
+# Ignore TeamCity
+.teamcity/
+
+# Ignore dotnet local tools
+.config/dotnet-tools.json
+
+# Ignore coverage tool output
+coverage/
+*.codecov
+
+# Ignore SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Ignore machine-specific files
+*.pidb
+*.userprefs
+
+# Ignore NuGet package sources
+nuget.config
